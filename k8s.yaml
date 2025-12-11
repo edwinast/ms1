@@ -1,0 +1,130 @@
+
+#Deployment maneja pods y replica sets
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  namespace: edwinast-dev
+  name: ms1
+  labels:
+    app: ms1
+    areanegocio: pagos
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ms1
+  template:
+    metadata:
+      labels:
+        app: ms1
+    spec:
+      containers:
+        - name: ms1
+          image: edwinast/ms1:{{ imageTag }}
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+          envFrom:
+            - configMapRef:
+                name: ms1
+            - secretRef:
+                name: ms1
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 3000
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 3000
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 3000
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            initialDelaySeconds: 5
+          envFrom:
+            - configMapRef:
+                name: ms1
+            - secretRef:
+                name: ms1            
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: edwinast-dev
+  name: ms1
+spec:
+  selector:
+    app: ms1
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: edwinast-dev
+  name: ms1
+data:
+  LOG_LEVEL: "debug"
+  DATABASE_HOST: "mi-postgres-postgresql-primary.edwinast-dev.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "postgres"
+  DATABASE_USER: "postgres"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: edwinast-dev
+  name: ms1
+data:
+  DATABASE_PASSWORD: TWlQYXNzd29yZFNlZ3VybzEyMw==
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: edwinast-dev
+  name: ms1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ms1
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization ## EN BASE AL REQUEST
+          averageUtilization: 90
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization ## EN BASE AL REQUEST
+          averageUtilization: 90
+
+            
